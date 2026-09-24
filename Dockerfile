@@ -25,7 +25,10 @@ RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoload
 
 # ---------- runtime (FrankenPHP) ----------
 FROM dunglas/frankenphp:php8.4 AS runtime
-RUN install-php-extensions pdo_pgsql pgsql intl zip opcache
+RUN install-php-extensions pdo_pgsql pgsql intl zip opcache \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
 COPY --from=builder /app /app
@@ -37,5 +40,9 @@ RUN chmod +x /usr/local/bin/entrypoint.sh \
     && chown -R www-data:www-data storage bootstrap/cache
 
 EXPOSE 8000
+
+# Sobreescribe el healthcheck de la imagen base (apunta al admin de Caddy, que desactivamos)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=5 \
+    CMD curl -fsS http://127.0.0.1:8000/ >/dev/null 2>&1 || exit 1
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
